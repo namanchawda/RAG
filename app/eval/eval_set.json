@@ -1,0 +1,156 @@
+[
+  {
+    "id": "q01",
+    "question": "Where is Apple headquartered?",
+    "expected_answer": "Apple Inc. is headquartered in Cupertino, California.",
+    "source_file": "aapl_10k_2025.html",
+    "category": "direct"
+  },
+  {
+    "id": "q02",
+    "question": "On which stock exchange is Apple's common stock traded, and what is the ticker symbol?",
+    "expected_answer": "Apple's common stock is traded on The Nasdaq Stock Market under the ticker symbol AAPL.",
+    "source_file": "aapl_10k_2025.html",
+    "category": "direct"
+  },
+  {
+    "id": "q03",
+    "question": "What fiscal year ended in Apple's 2025 Form 10-K?",
+    "expected_answer": "The fiscal year ended on September 27, 2025.",
+    "source_file": "aapl_10k_2025.html",
+    "category": "direct"
+  },
+  {
+    "id": "q04",
+    "question": "What did Apple announce in May 2025 regarding a repurchase program?",
+    "expected_answer": "Apple announced a new $100 billion share repurchase program on May 1, 2025.",
+    "source_file": "aapl_10k_2025.html",
+    "category": "direct"
+  },
+  {
+    "id": "q05",
+    "question": "Apple's base of operations is in which city and state?",
+    "expected_answer": "Apple's headquarters are in Cupertino, California.",
+    "source_file": "aapl_10k_2025.html",
+    "category": "semantic_paraphrase"
+  },
+  {
+    "id": "q06",
+    "question": "Which exchange lists Apple shares and what symbol identifies them?",
+    "expected_answer": "Apple shares trade on The Nasdaq Stock Market under the symbol AAPL.",
+    "source_file": "aapl_10k_2025.html",
+    "category": "semantic_paraphrase"
+  },
+  {
+    "id": "q07",
+    "question": "When did Apple's most recent fiscal year close?",
+    "expected_answer": "Apple's fiscal year ended on September 27, 2025.",
+    "source_file": "aapl_10k_2025.html",
+    "category": "semantic_paraphrase"
+  },
+  {
+    "id": "q08",
+    "question": "How much was the repurchase authorization Apple announced in May 2024, and when was it fully utilized?",
+    "expected_answer": "Apple announced a $110 billion repurchase program in May 2024, and it was fully utilized by Q4 2025.",
+    "source_file": "aapl_10k_2025.html",
+    "category": "numeric_lookup"
+  },
+  {
+    "id": "q09",
+    "question": "What was the size of the new share repurchase program announced by Apple on May 1, 2025?",
+    "expected_answer": "The new authorized repurchase program was $100 billion.",
+    "source_file": "aapl_10k_2025.html",
+    "category": "numeric_lookup"
+  },
+  {
+    "id": "q10",
+    "question": "On which stock exchange is JPMorgan Chase common stock traded, and what is the ticker symbol?",
+    "expected_answer": "JPMorgan Chase common stock trades on the New York Stock Exchange under the ticker symbol JPM.",
+    "source_file": "jpm_10k_2025.html",
+    "category": "direct"
+  },
+  {
+    "id": "q11",
+    "question": "Where is JPMorgan Chase headquartered?",
+    "expected_answer": "JPMorgan Chase is headquartered at 270 Park Avenue, New York City.",
+    "source_file": "jpm_10k_2025.html",
+    "category": "direct"
+  },
+  {
+    "id": "q12",
+    "question": "What were JPMorgan's total assets and stockholders' equity at December 31, 2025?",
+    "expected_answer": "At December 31, 2025, total assets were $4.4 trillion and stockholders' equity was $362.4 billion.",
+    "source_file": "jpm_10k_2025.html",
+    "category": "direct"
+  },
+  {
+    "id": "q13",
+    "question": "What were JPMorgan's net income and diluted EPS in 2025?",
+    "expected_answer": "In 2025, JPMorgan reported net income of $57,048 million and diluted EPS of $20.02.",
+    "source_file": "jpm_10k_2025.html",
+    "category": "direct"
+  },
+  {
+    "id": "q14",
+    "question": "What is the exact address of JPMorgan's headquarters in New York City?",
+    "expected_answer": "JPMorgan's headquarters is located at 270 Park Avenue, New York City.",
+    "source_file": "jpm_10k_2025.html",
+    "category": "semantic_paraphrase"
+  },
+  {
+    "id": "q15",
+    "question": "How large was JPMorgan's balance sheet and shareholder equity base at the end of 2025?",
+    "expected_answer": "At December 31, 2025, JPMorgan had total assets of $4.4 trillion and stockholders' equity of $362.4 billion.",
+    "source_file": "jpm_10k_2025.html",
+    "category": "semantic_paraphrase"
+  },
+  {
+    "id": "q16",
+    "question": "What was JPMorgan's earnings performance in 2025 in terms of income and per-share results?",
+    "expected_answer": "JPMorgan reported net income of $57,048 million and diluted EPS of $20.02 for 2025.",
+    "source_file": "jpm_10k_2025.html",
+    "category": "semantic_paraphrase"
+  },
+  {
+    "id": "q17",
+    "question": "What was JPMorgan's net income in 2025, in millions of dollars?",
+    "expected_answer": "JPMorgan's net income was $57,048 million in 2025.",
+    "source_file": "jpm_10k_2025.html",
+    "category": "numeric_lookup"
+  },
+  {
+    "id": "q18",
+    "question": "What were JPMorgan's diluted EPS figures for 2025, 2024, and 2023?",
+    "expected_answer": "JPMorgan reported diluted EPS of $20.02 in 2025, $19.75 in 2024, and $16.23 in 2023.",
+    "source_file": "jpm_10k_2025.html",
+    "category": "numeric_lookup"
+  },
+  {
+    "id": "q19",
+    "question": "What is JPMorgan Chase's market capitalization growth from 2024 to 2025?",
+    "expected_answer": "Not enough information in context.",
+    "source_file": "aapl_10k_2025.html",
+    "category": "out_of_scope"
+  },
+  {
+    "id": "q20",
+    "question": "What was Apple's net income and diluted EPS in 2025 compared with 2024?",
+    "expected_answer": "Not enough information in context.",
+    "source_file": "jpm_10k_2025.html",
+    "category": "out_of_scope"
+  },
+  {
+    "id": "q21",
+    "question": "How did JPMorgan's net income change from 2023 to 2025, and what does that imply about the 2025 value relative to 2023?",
+    "expected_answer": "JPMorgan net income rose from $49,552 million in 2023 to $57,048 million in 2025, an increase of $7,496 million; 2025 was higher than 2023 by roughly 15.1%.",
+    "source_file": "jpm_10k_2025.html",
+    "category": "cross_reference"
+  },
+  {
+    "id": "q22",
+    "question": "Compare JPMorgan's diluted EPS across 2023, 2024, and 2025; which year had the highest per-share result and by how much compared with 2023?",
+    "expected_answer": "JPMorgan diluted EPS was $16.23 in 2023, $19.75 in 2024, and $20.02 in 2025; 2025 was the highest, exceeding 2023 by $3.79 per share.",
+    "source_file": "jpm_10k_2025.html",
+    "category": "cross_reference"
+  }
+]
