@@ -7,18 +7,22 @@ import re
 import tiktoken
 
 
-def _token_count(text: str) -> int:
+def _token_count(text: str, encoding=None) -> int:
     """Return the token count for a string using the OpenAI cl100k_base encoding."""
     if not text or not text.strip():
         return 0
-    encoding = tiktoken.get_encoding("cl100k_base")
+    encoding = encoding or tiktoken.get_encoding("cl100k_base")
     return len(encoding.encode(text))
 
 
-def _make_chunk(text: str, chunk_id: int) -> dict:
+def _make_chunk(text: str, chunk_id: int, token_count: int | None = None, encoding=None) -> dict:
     """Normalize a chunk payload to the shared record shape."""
     cleaned = text.strip()
-    return {"text": cleaned, "chunk_id": chunk_id, "token_count": _token_count(cleaned)}
+    return {
+        "text": cleaned,
+        "chunk_id": chunk_id,
+        "token_count": token_count if token_count is not None else _token_count(cleaned, encoding),
+    }
 
 
 def chunk_fixed(text: str, chunk_size: int = 512, chunk_overlap: int = 50) -> list[dict]:
@@ -79,18 +83,21 @@ def chunk_sentence_aware(text: str, max_tokens: int = 512) -> list[dict]:
     if not sentences:
         return []
 
+    encoding = tiktoken.get_encoding("cl100k_base")
     chunks: list[dict] = []
-    current = ""
+    current_sentences: list[str] = []
+    current_token_count = 0
     chunk_id = 0
 
     for sentence in sentences:
-        sentence_tokens = _token_count(sentence)
+        sentence_tokens = _token_count(sentence, encoding)
 
         if sentence_tokens > max_tokens:
-            if current:
-                chunks.append(_make_chunk(current, chunk_id))
+            if current_sentences:
+                chunks.append(_make_chunk(" ".join(current_sentences), chunk_id, current_token_count, encoding))
                 chunk_id += 1
-                current = ""
+                current_sentences = []
+                current_token_count = 0
 
             long_sentence_chunks = chunk_fixed(sentence, chunk_size=max_tokens, chunk_overlap=0)
             for long_chunk in long_sentence_chunks:
@@ -104,16 +111,17 @@ def chunk_sentence_aware(text: str, max_tokens: int = 512) -> list[dict]:
                 chunk_id += 1
             continue
 
-        candidate = sentence if not current else f"{current} {sentence}"
-        if current and _token_count(candidate) > max_tokens:
-            chunks.append(_make_chunk(current, chunk_id))
+        if current_sentences and current_token_count + sentence_tokens > max_tokens:
+            chunks.append(_make_chunk(" ".join(current_sentences), chunk_id, current_token_count, encoding))
             chunk_id += 1
-            current = sentence
+            current_sentences = [sentence]
+            current_token_count = sentence_tokens
         else:
-            current = candidate
+            current_sentences.append(sentence)
+            current_token_count += sentence_tokens
 
-    if current:
-        chunks.append(_make_chunk(current, chunk_id))
+    if current_sentences:
+        chunks.append(_make_chunk(" ".join(current_sentences), chunk_id, current_token_count, encoding))
 
     return chunks
 
@@ -126,6 +134,7 @@ def chunk_paragraph_based(text: str, max_tokens: int = 512) -> list[dict]:
     if not text or not text.strip():
         return []
 
+    encoding = tiktoken.get_encoding("cl100k_base")
     paragraphs = [part.strip() for part in re.split(r"\n\s*\n+", text.strip()) if part and part.strip()]
     if not paragraphs:
         return []
@@ -134,8 +143,9 @@ def chunk_paragraph_based(text: str, max_tokens: int = 512) -> list[dict]:
     chunk_id = 0
 
     for paragraph in paragraphs:
-        if _token_count(paragraph) <= max_tokens:
-            chunks.append(_make_chunk(paragraph, chunk_id))
+        paragraph_tokens = _token_count(paragraph, encoding)
+        if paragraph_tokens <= max_tokens:
+            chunks.append(_make_chunk(paragraph, chunk_id, paragraph_tokens, encoding))
             chunk_id += 1
             continue
 
@@ -160,6 +170,7 @@ def chunk_recursive(text: str, max_tokens: int = 512) -> list[dict]:
     if not text or not text.strip():
         return []
 
+    encoding = tiktoken.get_encoding("cl100k_base")
     paragraphs = [part.strip() for part in re.split(r"\n\s*\n+", text.strip()) if part and part.strip()]
     if not paragraphs:
         return []
@@ -168,13 +179,14 @@ def chunk_recursive(text: str, max_tokens: int = 512) -> list[dict]:
     chunk_id = 0
 
     for paragraph in paragraphs:
-        if _token_count(paragraph) <= max_tokens:
-            chunks.append(_make_chunk(paragraph, chunk_id))
+        paragraph_tokens = _token_count(paragraph, encoding)
+        if paragraph_tokens <= max_tokens:
+            chunks.append(_make_chunk(paragraph, chunk_id, paragraph_tokens, encoding))
             chunk_id += 1
             continue
 
         sentence_chunks = chunk_sentence_aware(paragraph, max_tokens=max_tokens)
-        if sentence_chunks and all(_token_count(candidate["text"]) <= max_tokens for candidate in sentence_chunks):
+        if sentence_chunks and all(candidate["token_count"] <= max_tokens for candidate in sentence_chunks):
             for candidate in sentence_chunks:
                 chunks.append(
                     {

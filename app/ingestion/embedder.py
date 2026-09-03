@@ -6,6 +6,8 @@ call. This keeps the local embedding workflow efficient for batch document inges
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from sentence_transformers import SentenceTransformer
 
 from app.config import settings
@@ -21,7 +23,10 @@ def load_embedding_model(model_name: str = settings.EMBEDDING_MODEL):
     return MODEL
 
 
-def embed_texts(texts: list[str]) -> list[list[float]]:
+def embed_texts(
+    texts: list[str],
+    progress_callback: Callable[[int, int], None] | None = None,
+) -> list[list[float]]:
     """Generate embeddings for a list of text strings and return Python float lists.
 
     The model is called in a single batch to keep the embedding pipeline efficient.
@@ -30,7 +35,19 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
         return []
 
     model = load_embedding_model(settings.EMBEDDING_MODEL)
-    embeddings = model.encode(texts, batch_size=32, convert_to_numpy=False, normalize_embeddings=False)
+    if progress_callback is not None:
+        progress_callback(0, len(texts))
+
+    embeddings = model.encode(
+        texts,
+        batch_size=64,
+        show_progress_bar=False,
+        convert_to_numpy=False,
+        normalize_embeddings=False,
+    )
+
+    if progress_callback is not None:
+        progress_callback(len(texts), len(texts))
 
     return [[float(value) for value in vector] for vector in embeddings]
 

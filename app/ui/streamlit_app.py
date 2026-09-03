@@ -17,6 +17,7 @@ from app.config import settings
 from app.generation.rag_pipeline import prepare_answer, stream_prepared_answer
 from app.ingestion import store
 from app.ingestion.ingest import ingest_file
+from app.ingestion.loader import load_filing
 
 DocumentChunk = store.DocumentChunk
 
@@ -30,6 +31,8 @@ CHUNKING_STRATEGY_LABELS = {
     "paragraph_based": "Paragraph-based",
     "recursive": "Recursive (paragraph → sentence → fixed)",
 }
+TEXT_WARNING_LIMIT = 200_000
+TEXT_HARD_LIMIT = 1_000_000
 
 
 def format_strategy_label(strategy: str) -> str:
@@ -199,16 +202,34 @@ with st.sidebar:
         else:
             destination = RAW_DIR / uploaded_file.name
             try:
-                progress_bar = st.progress(0, text="Preparing ingestion...")
+                progress_bar = st.progress(0.0, text="Loading document... (0%)")
 
                 def update_progress(message: str, progress: float) -> None:
-                    progress_bar.progress(progress, text=message)
+                    progress_bar.progress(min(max(progress, 0.0), 1.0), text=message)
 
                 destination.write_bytes(uploaded_file.getvalue())
+                extracted_text = load_filing(str(destination))
+                st.info(f"Extracted {len(extracted_text):,} characters of text from this document.")
+
+                if len(extracted_text) > TEXT_HARD_LIMIT:
+                    st.error(
+                        f"This document contains {len(extracted_text):,} extracted characters, which exceeds the "
+                        f"{TEXT_HARD_LIMIT:,}-character limit for this hosted environment."
+                    )
+                    progress_bar.empty()
+                    st.stop()
+
+                if len(extracted_text) >= TEXT_WARNING_LIMIT:
+                    st.warning(
+                        f"This document contains {len(extracted_text):,} extracted characters and may take several "
+                        "minutes to process on this hosted environment."
+                    )
+
                 ingest_file(
                     str(destination),
                     chunking_strategy=chunking_strategy,
                     progress_callback=update_progress,
+                    extracted_text=extracted_text,
                 )
                 st.success(
                     f"Ingested {uploaded_file.name} successfully using '{CHUNKING_STRATEGY_LABELS[chunking_strategy]}'."

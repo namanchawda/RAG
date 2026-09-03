@@ -7,10 +7,11 @@ understanding and semantics to a later phase.
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 from bs4 import BeautifulSoup
-from pypdf import PdfReader
+import pymupdf as fitz
 
 
 def _read_text_with_fallback(path: Path) -> str:
@@ -45,12 +46,23 @@ def load_filing(filepath: str) -> str:
         if not path.read_bytes().startswith(b"%PDF-"):
             raise ValueError("File does not appear to be a valid PDF (invalid header)")
 
-        reader = PdfReader(str(path))
-        pages: list[str] = []
-        for page in reader.pages:
-            text = page.extract_text() or ""
-            pages.append(text)
-        return "\n".join(pages)
+        extraction_started = time.perf_counter()
+        extracted_text = ""
+        try:
+            document = fitz.open(filepath)
+            pages: list[str] = []
+            for page in document:
+                pages.append(page.get_text())
+            extracted_text = "\n".join(pages)
+            return extracted_text
+        finally:
+            if "document" in locals():
+                document.close()
+            extraction_seconds = time.perf_counter() - extraction_started
+            print(
+                f"PDF text extraction for {path.name}: {extraction_seconds:.3f} seconds "
+                f"({len(extracted_text):,} characters)"
+            )
 
     if suffix in {".txt", ".md", ".rtf"}:
         return _read_text_with_fallback(path)

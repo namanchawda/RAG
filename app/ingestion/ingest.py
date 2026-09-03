@@ -22,6 +22,7 @@ def ingest_file(
     filepath: str,
     chunking_strategy: str = "fixed",
     progress_callback: Callable[[str, float], None] | None = None,
+    extracted_text: str | None = None,
 ) -> None:
     """Load a filing, create chunks, embed them, and store the result in Postgres.
 
@@ -38,9 +39,9 @@ def ingest_file(
     if not path.exists():
         raise FileNotFoundError(f"Filing not found: {filepath}")
 
-    report("Loading document...", 0.05)
-    raw_text = load_filing(str(path))
-    report("Chunking...", 0.2)
+    report("Loading document... (5%)", 0.05)
+    raw_text = extracted_text if extracted_text is not None else load_filing(str(path))
+    report("Chunking... (20%)", 0.2)
     chunks = chunk_text(raw_text, strategy=chunking_strategy)
     print(f"Loaded {filepath}: produced {len(chunks)} chunks")
 
@@ -49,13 +50,17 @@ def ingest_file(
         return
 
     texts = [chunk["text"] for chunk in chunks]
-    embeddings: list[list[float]] = []
-    batch_size = 32
-    for start in range(0, len(texts), batch_size):
-        batch_embeddings = embed_texts(texts[start : start + batch_size])
-        embeddings.extend(batch_embeddings)
-        embedded_count = min(start + batch_size, len(texts))
-        report(f"Embedding {embedded_count}/{len(texts)} chunks...", 0.2 + 0.65 * embedded_count / len(texts))
+    def report_embedding_progress(current: int, total: int) -> None:
+        percentage = round(current / total * 100) if total else 100
+        if current == 0:
+            report(f"Embedding: 0/{total} chunks (0%)", 0.2)
+        else:
+            report(
+                f"Embedding: {current}/{total} chunks ({percentage}%)",
+                0.2 + 0.65 * current / total,
+            )
+
+    embeddings = embed_texts(texts, progress_callback=report_embedding_progress)
 
     if len(embeddings) != len(chunks):
         raise ValueError(
@@ -63,9 +68,9 @@ def ingest_file(
         )
 
     source_file = path.name
-    report("Storing...", 0.95)
+    report("Storing... (95%)", 0.95)
     store.store_chunks(source_file, chunks, embeddings, chunking_strategy=chunking_strategy)
-    report("Complete", 1.0)
+    report("Complete (100%)", 1.0)
     print(f"Stored {len(chunks)} chunks for {source_file} in the vector database.")
 
 
