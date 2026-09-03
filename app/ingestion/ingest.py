@@ -23,7 +23,7 @@ def ingest_file(
     chunking_strategy: str = "fixed",
     progress_callback: Callable[[str, float], None] | None = None,
     extracted_text: str | None = None,
-) -> None:
+) -> int:
     """Load a filing, create chunks, embed them, and store the result in Postgres.
 
     Step 1: read the document text from a local file via load_filing().
@@ -47,7 +47,7 @@ def ingest_file(
 
     if not chunks:
         print(f"No chunks generated for {filepath}; skipping storage.")
-        return
+        return 0
 
     texts = [chunk["text"] for chunk in chunks]
     def report_embedding_progress(current: int, total: int) -> None:
@@ -72,6 +72,7 @@ def ingest_file(
     store.store_chunks(source_file, chunks, embeddings, chunking_strategy=chunking_strategy)
     report("Complete (100%)", 1.0)
     print(f"Stored {len(chunks)} chunks for {source_file} in the vector database.")
+    return len(chunks)
 
 
 def file_already_ingested(source_file: str, chunking_strategy: str | None = None) -> bool:

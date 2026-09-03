@@ -90,6 +90,7 @@ def answer_question(
             {
                 "source_file": row["source_file"],
                 "chunk_id": row["chunk_id"],
+                "chunk_text": row.get("chunk_text", ""),
                 "distance": row.get("distance", row.get("rank_score", 0.0)),
                 "rerank_score": row.get("rerank_score"),
             }

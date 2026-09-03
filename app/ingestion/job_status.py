@@ -24,6 +24,7 @@ def default_status() -> dict:
         "stage": "idle",
         "current": 0,
         "total": 0,
+        "chunk_count": 0,
         "started_at": None,
         "error": None,
     }

@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import json
+import multiprocessing
 import os
-import re
 import sys
 import time
-import threading
 from pathlib import Path
 
 os.environ["STREAMLIT_WATCHER_TYPE"] = "none"
@@ -17,9 +16,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import streamlit as st
 
 from app.config import settings
-from app.generation.rag_pipeline import prepare_answer, stream_prepared_answer
+from app.generation.rag_pipeline import answer_question
 from app.ingestion import store
-from app.ingestion.ingest import ingest_file
+from app.ingestion.background_worker import run_ingestion_job
 from app.ingestion.job_status import mark_stale_if_needed, read_status, write_status
 
 DocumentChunk = store.DocumentChunk
@@ -44,6 +43,14 @@ def format_strategy_label(strategy: str) -> str:
     return CHUNKING_STRATEGY_LABELS.get(strategy, strategy)
 
 
+def format_document_label(document: dict) -> str:
+    """Display a compact document label while retaining the full source value."""
+    filename = document["source_file"]
+    if len(filename) > 40:
+        filename = f"{filename[:37]}..."
+    return f"{filename} ({document['chunking_strategy']})"
+
+
 def save_connection_details(connection_string: str, groq_api_key: str, groq_model: str) -> None:
     """Persist the active DB and Groq settings to a local JSON file."""
     payload = {
@@ -60,51 +67,16 @@ def clear_connection_details() -> None:
         CONNECTION_FILE.unlink()
 
 
-def run_ingestion_job(filepath: str, filename: str, chunking_strategy: str) -> None:
-    """Run ingestion outside the Streamlit script and persist every state update."""
-    def update_progress(message: str, progress: float) -> None:
-        stage = re.sub(r"\s*\(\d+%\)\s*$", "", message.split(":", 1)[0]).strip().rstrip(".")
-        current = 0
-        total = 0
-        if stage == "Embedding" and "/" in message:
-            counts = message.split(":", 1)[1].split("(", 1)[0].strip().split("/")
-            current = int(counts[0])
-            total = int(counts[1].split()[0])
-        write_status(stage=stage.lower(), current=current, total=total)
-
-    try:
-        ingest_file(filepath, chunking_strategy=chunking_strategy, progress_callback=update_progress)
-        status = read_status()
-        write_status(
-            in_progress=False,
-            stage="complete",
-            current=status.get("current", 0),
-            total=status.get("total", 0),
-            error=None,
-        )
-    except Exception as exc:  # pragma: no cover - worker error is rendered by the UI
-        write_status(in_progress=False, stage="failed", error=str(exc))
-
-
-def start_ingestion_job(filepath: str, filename: str, chunking_strategy: str) -> None:
-    """Start a daemon ingestion worker after recording its initial durable state."""
-    write_status(
-        in_progress=True,
-        filename=filename,
-        stage="starting",
-        current=0,
-        total=0,
-        started_at=time.time(),
-        error=None,
-    )
-    launch_ingestion_worker(filepath, filename, chunking_strategy)
-
-
-def launch_ingestion_worker(filepath: str, filename: str, chunking_strategy: str) -> None:
-    """Launch a worker after the uploaded file is safely available on disk."""
-    worker = threading.Thread(
+def launch_ingestion_worker(
+    filepath: str,
+    filename: str,
+    chunking_strategy: str,
+    database_url: str,
+) -> None:
+    """Launch a standalone daemon process after the uploaded file is on disk."""
+    worker = multiprocessing.Process(
         target=run_ingestion_job,
-        args=(filepath, filename, chunking_strategy),
+        args=(filepath, filename, chunking_strategy, database_url),
         daemon=True,
         name="ingestion-worker",
     )
@@ -113,28 +85,62 @@ def launch_ingestion_worker(filepath: str, filename: str, chunking_strategy: str
 
 def render_ingestion_monitor() -> None:
     """Poll durable worker status so progress survives Streamlit reruns and refreshes."""
-    status_placeholder = st.empty()
-
     @st.fragment(run_every="2s")
-    def poll_status() -> None:
+    def poll_main_status() -> None:
         status = mark_stale_if_needed()
         if status.get("in_progress"):
             current = status.get("current", 0)
             total = status.get("total", 0)
             percent = round(current / total * 100) if total else 0
             stage = str(status.get("stage", "starting")).replace("_", " ").title()
-            status_placeholder.info(
+            message = (
                 f"A document is currently being ingested: {status.get('filename', '')} "
                 f"— {stage} ({percent}%)"
             )
-            status_placeholder.progress(
-                min(max(percent / 100, 0.0), 1.0),
-                text=f"{stage}: {current}/{total} chunks ({percent}%)" if total else f"{stage}...",
+            progress_text = (
+                f"{stage}: {current}/{total} chunks ({percent}%)"
+                if total else f"{stage}..."
             )
+            st.info(message)
+            if stage.lower() == "embedding" and total > 0:
+                st.progress(
+                    min(max(percent / 100, 0.0), 1.0),
+                    text=progress_text,
+                )
         elif status.get("stage") == "failed":
-            status_placeholder.error(f"Ingestion failed: {status.get('error', 'Unknown error')}")
+            st.error(f"Ingestion failed: {status.get('error', 'Unknown error')}")
 
-    poll_status()
+    @st.fragment(run_every="2s")
+    def poll_sidebar_status() -> None:
+        status = mark_stale_if_needed()
+        if status.get("in_progress"):
+            current = status.get("current", 0)
+            total = status.get("total", 0)
+            percent = round(current / total * 100) if total else 0
+            stage = str(status.get("stage", "starting")).replace("_", " ").title()
+            message = (
+                f"A document is currently being ingested: {status.get('filename', '')} "
+                f"— {stage} ({percent}%)"
+            )
+            progress_text = (
+                f"{stage}: {current}/{total} chunks ({percent}%)"
+                if total else f"{stage}..."
+            )
+            st.info(message)
+            if stage.lower() == "embedding" and total > 0:
+                st.progress(min(max(percent / 100, 0.0), 1.0), text=progress_text)
+        elif status.get("stage") == "failed":
+            st.error(f"Ingestion failed: {status.get('error', 'Unknown error')}")
+        elif status.get("stage") == "complete" and not st.session_state.get("ingestion_success_pending"):
+            st.session_state["ingestion_success_pending"] = {
+                "filename": status.get("filename", "document"),
+                "chunk_count": status.get("chunk_count", status.get("total", 0)),
+            }
+            st.rerun()
+
+    poll_main_status()
+    with st.sidebar:
+        poll_sidebar_status()
 
 
 def get_available_documents() -> list[dict]:
@@ -163,6 +169,7 @@ st.set_page_config(page_title="RAG", page_icon="📄", layout="wide")
 
 if "db_connected" not in st.session_state:
     st.session_state["db_connected"] = False
+st.session_state.setdefault("asking", False)
 
 if not st.session_state.get("db_connected") and CONNECTION_FILE.exists():
     try:
@@ -255,6 +262,12 @@ st.title("RAG")
 ingestion_in_progress = bool(ingestion_status.get("in_progress"))
 if ingestion_in_progress:
     render_ingestion_monitor()
+success_pending = st.session_state.pop("ingestion_success_pending", None)
+if success_pending:
+    st.success(
+        f"{success_pending['filename']} successfully ingested "
+        f"({success_pending['chunk_count']} chunks)."
+    )
 
 selected_source = None
 
@@ -266,21 +279,12 @@ with st.sidebar:
 
     st.header("Ingest a document")
     uploaded_file = st.file_uploader(
-        "Upload a PDF or HTML filing",
-        type=["pdf", "html", "htm"],
+        "Upload a PDF, HTML, or text filing",
+        type=["pdf", "html", "htm", "txt"],
         accept_multiple_files=False,
         disabled=ingestion_in_progress,
     )
-    if ingestion_in_progress:
-        status_stage = str(ingestion_status.get("stage", "starting")).replace("_", " ").title()
-        status_current = ingestion_status.get("current", 0)
-        status_total = ingestion_status.get("total", 0)
-        status_percent = round(status_current / status_total * 100) if status_total else 0
-        st.info(
-            f"A document is currently being ingested: {ingestion_status.get('filename', '')} "
-            f"— {status_stage} ({status_percent}%)."
-        )
-    elif uploaded_file is not None and uploaded_file.size > 5 * 1024 * 1024:
+    if not ingestion_in_progress and uploaded_file is not None and uploaded_file.size > 5 * 1024 * 1024:
         st.warning("Large files may take several minutes to process on this hosted environment.")
 
     chunking_strategy = st.selectbox(
@@ -292,7 +296,9 @@ with st.sidebar:
 
     if st.button("Ingest", disabled=ingestion_in_progress):
         if uploaded_file is None:
-            st.warning("Please upload a PDF or HTML file before ingesting.")
+            st.warning("Please upload a PDF, HTML, or TXT file before ingesting.")
+        elif Path(uploaded_file.name).suffix.lower() not in {".pdf", ".html", ".htm", ".txt"}:
+            st.error("Unsupported file type. Please upload a .pdf, .html, .htm, or .txt file.")
         else:
             destination = RAW_DIR / uploaded_file.name
             try:
@@ -306,7 +312,13 @@ with st.sidebar:
                     error=None,
                 )
                 destination.write_bytes(uploaded_file.getvalue())
-                launch_ingestion_worker(str(destination), uploaded_file.name, chunking_strategy)
+                database_url = store.engine.url.render_as_string(hide_password=False)
+                launch_ingestion_worker(
+                    str(destination),
+                    uploaded_file.name,
+                    chunking_strategy,
+                    database_url,
+                )
                 st.success(f"Ingestion started for {uploaded_file.name}.")
                 st.rerun()
             except Exception as exc:
@@ -320,13 +332,19 @@ with st.sidebar:
     selected_doc = st.selectbox(
         "Choose a document",
         options=document_options,
-        format_func=lambda option: option["label"],
+        format_func=lambda option: placeholder_label if not option["source_file"] else format_document_label(option),
         index=0,
+        disabled=ingestion_in_progress,
     )
     selected_source = selected_doc.get("source_file") if selected_doc and selected_doc.get("source_file") else None
     selected_chunking_strategy = (
         selected_doc.get("chunking_strategy") if selected_doc and selected_doc.get("chunking_strategy") else None
     )
+
+    selected_document_key = (selected_source, selected_chunking_strategy)
+    if st.session_state.get("selected_document_key") != selected_document_key:
+        st.session_state["selected_document_key"] = selected_document_key
+        st.session_state["use_reranking"] = True
 
     st.caption(f"Active Groq model: {settings.GROQ_MODEL}")
 
@@ -334,37 +352,60 @@ if selected_source is None:
     st.info("Select a document from the sidebar to start asking questions.")
 else:
     st.header("Ask a question")
-    use_reranking = st.toggle("Use reranking", value=True)
+    use_reranking = st.toggle("Use reranking", key="use_reranking")
+    st.caption("Reranking improves answer accuracy but increases response time. Turn off for faster replies.")
     question = st.text_input("Question", placeholder="Example: What are Apple's main risk factors?")
-
-    if st.button("Ask"):
+    if st.button("Ask", disabled=st.session_state["asking"]):
         if not question.strip():
             st.warning("Please enter a question.")
-        else:
-            with st.spinner("Retrieving context..."):
-                prepared = prepare_answer(
-                    query=question,
+        elif not st.session_state["asking"]:
+            st.session_state["asking"] = True
+            st.session_state["ask_request"] = {
+                "query": question,
+                "source_file": selected_source,
+                "chunking_strategy": selected_chunking_strategy,
+                "use_reranking": use_reranking,
+            }
+            st.session_state.pop("ask_result", None)
+            st.rerun()
+
+    if st.session_state["asking"]:
+        request = st.session_state["ask_request"]
+        try:
+            with st.spinner("Retrieving context and generating answer..."):
+                st.session_state["ask_result"] = answer_question(
+                    query=request["query"],
                     top_k=5,
-                    source_file=selected_source,
-                    chunking_strategy=selected_chunking_strategy,
-                    use_reranking=use_reranking,
+                    source_file=request["source_file"],
+                    chunking_strategy=request["chunking_strategy"],
+                    use_reranking=request["use_reranking"],
                 )
+        except Exception as exc:
+            st.session_state["ask_result"] = {"error": str(exc)}
+        finally:
+            st.session_state["asking"] = False
+        st.rerun()
 
+    result = st.session_state.get("ask_result")
+    if result:
+        if result.get("error"):
+            st.error(f"Question failed: {result['error']}")
+        else:
             st.markdown("### Answer")
-            st.write_stream(stream_prepared_answer(prepared))
+            st.markdown(result["answer"])
 
-            mode_label = "reranking enabled" if prepared["reranking_used"] else "reranking disabled"
+            mode_label = "reranking enabled" if result.get("reranking_used") else "reranking disabled"
             st.caption(f"Mode: {mode_label}")
 
             with st.expander("Sources used"):
-                if not prepared["retrieved"]:
+                if not result.get("sources"):
                     st.write("No sources retrieved.")
                 else:
-                    for idx, source in enumerate(prepared["retrieved"], start=1):
+                    for idx, source in enumerate(result["sources"], start=1):
                         score = source.get("rerank_score")
                         if score is None:
                             score = source.get("distance")
                         st.markdown(
-                            f"**{idx}.** {source.get('source_file')} | strategy={source.get('chunking_strategy', 'fixed')} | chunk_id={source.get('chunk_id')} | score={score}"
+                            f"**{idx}.** {source.get('source_file')} | chunk_id={source.get('chunk_id')} | score={score}"
                         )
                         st.caption(source.get("chunk_text", ""))
