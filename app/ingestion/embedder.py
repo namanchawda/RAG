@@ -1,8 +1,4 @@
-"""Embedding utilities for generating vector representations with sentence-transformers.
-
-The embedding model is loaded once at module import so we do not reload it for each
-call. This keeps the local embedding workflow efficient for batch document ingestion.
-"""
+"""Embedding utilities for generating vector representations with sentence-transformers."""
 
 from __future__ import annotations
 
@@ -26,28 +22,31 @@ def load_embedding_model(model_name: str = settings.EMBEDDING_MODEL):
 def embed_texts(
     texts: list[str],
     progress_callback: Callable[[int, int], None] | None = None,
+    batch_size: int = 16,
 ) -> list[list[float]]:
-    """Generate embeddings for a list of text strings and return Python float lists.
-
-    The model is called in a single batch to keep the embedding pipeline efficient.
-    """
+    """Embed texts in small batches and report progress after each completed batch."""
     if not texts:
         return []
+    if batch_size <= 0:
+        raise ValueError("batch_size must be greater than zero")
 
     model = load_embedding_model(settings.EMBEDDING_MODEL)
+    total = len(texts)
     if progress_callback is not None:
-        progress_callback(0, len(texts))
+        progress_callback(0, total)
 
-    embeddings = model.encode(
-        texts,
-        batch_size=64,
-        show_progress_bar=False,
-        convert_to_numpy=False,
-        normalize_embeddings=False,
-    )
-
-    if progress_callback is not None:
-        progress_callback(len(texts), len(texts))
+    embeddings = []
+    for start in range(0, total, batch_size):
+        batch_embeddings = model.encode(
+            texts[start : start + batch_size],
+            batch_size=batch_size,
+            show_progress_bar=False,
+            convert_to_numpy=False,
+            normalize_embeddings=False,
+        )
+        embeddings.extend(batch_embeddings)
+        if progress_callback is not None:
+            progress_callback(min(start + batch_size, total), total)
 
     return [[float(value) for value in vector] for vector in embeddings]
 
