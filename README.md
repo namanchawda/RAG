@@ -5,7 +5,7 @@ PDF or HTML document, and ask questions about it. Built to understand RAG
 systems end-to-end — including real failure modes, how to diagnose them, 
 and how to fix them with evidence, not guesswork.
 
-**Live demo:** [add your deployed URL here once live]
+**Live demo:** https://hybrid-rag-engine.streamlit.app
 
 ## What this project demonstrates
 
@@ -38,6 +38,7 @@ context, refuse if not present), streamed token-by-token
 - **Vector DB:** PostgreSQL + pgvector (via [Neon](https://neon.tech), free tier)
 - **Embeddings:** `BAAI/bge-small-en-v1.5` (local, sentence-transformers)
 - **Reranker:** `BAAI/bge-reranker-base` (local cross-encoder)
+- **PDF parsing:** PyMuPDF (previously pypdf — replaced for performance on complex/image-heavy PDFs, see below)
 - **LLM:** Groq API (`openai/gpt-oss-120b`)
 - **UI:** Streamlit
 - **Full-text search:** PostgreSQL native `tsvector`/`ts_rank`
@@ -70,6 +71,35 @@ document from the UI.
 Confirmed that hybrid search and reranking alone could not fix this — both 
 were already active on the failing run. Only a structural change to chunking 
 resolved it.
+
+## A production bug: slow PDF extraction on complex documents
+
+While testing the deployed app with a large (41MB), image/graphics-heavy PDF,
+ingestion appeared to hang with no visible progress.
+
+**Diagnosis:** added timing instrumentation around the PDF text extraction step
+specifically (separate from chunking/embedding). Found that `pypdf` took over
+16 seconds to extract just 12,845 characters from a single complex PDF — an
+extreme mismatch between processing time and actual text content, caused by
+`pypdf`'s parser working through the file's embedded graphics/font structures
+even though only the text was needed.
+
+**Fix:** switched PDF extraction to PyMuPDF (`fitz`), a faster C-based PDF
+parser. Also added real-time, granular ingestion progress (showing live chunk
+counts during embedding) and transparent extracted-character-count messaging,
+since file size in MB is a poor predictor of processing time — a small,
+graphics-heavy PDF can take longer to parse than a much larger, text-only one.
+
+**Result**, same file, before and after:
+
+| Library | Extraction time | Characters extracted |
+|---|---|---|
+| pypdf | 16.3 seconds | 12,845 |
+| PyMuPDF | 0.34 seconds | 14,198 |
+
+A ~48x speedup, while also extracting more complete text — PyMuPDF's parser
+handled the file's malformed internal structure (a dictionary key redefinition
+error) more gracefully than pypdf did.
 
 ## Chunking strategies available
 
@@ -117,6 +147,9 @@ Both are entered directly in the app UI — no `.env` file needed to run it.
 pip install -r requirements.txt
 streamlit run app/ui/streamlit_app.py
 ```
+Note: large documents (500,000+ extracted characters) may take several
+minutes to embed on free-tier hosting — the app shows live progress during
+ingestion.
 Paste your Neon connection string and Groq API key on the first screen, click 
 Connect. Upload a document, choose a chunking strategy, click Ingest, then 
 ask questions.
