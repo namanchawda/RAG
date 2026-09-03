@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import os
 
 from app.ingestion import store
 from app.ingestion.ingest import ingest_file
@@ -16,19 +17,20 @@ def run_ingestion_job(
     database_url: str,
 ) -> None:
     """Run ingestion in a child process without importing the Streamlit app."""
-    store.init_engine(database_url)
-
-    def update_progress(message: str, progress: float) -> None:
-        stage = re.sub(r"\s*\(\d+%\)\s*$", "", message.split(":", 1)[0]).strip().rstrip(".")
-        current = 0
-        total = 0
-        if stage == "Embedding" and "/" in message:
-            counts = message.split(":", 1)[1].split("(", 1)[0].strip().split("/")
-            current = int(counts[0])
-            total = int(counts[1].split()[0])
-        write_status(stage=stage.lower(), current=current, total=total)
-
     try:
+        store.init_engine(database_url)
+        write_status(process_pid=os.getpid())
+
+        def update_progress(message: str, progress: float) -> None:
+            stage = re.sub(r"\s*\(\d+%\)\s*$", "", message.split(":", 1)[0]).strip().rstrip(".")
+            current = 0
+            total = 0
+            if stage == "Embedding" and "/" in message:
+                counts = message.split(":", 1)[1].split("(", 1)[0].strip().split("/")
+                current = int(counts[0])
+                total = int(counts[1].split()[0])
+            write_status(stage=stage.lower(), current=current, total=total)
+
         chunk_count = ingest_file(
             filepath,
             chunking_strategy=chunking_strategy,
@@ -44,4 +46,9 @@ def run_ingestion_job(
             error=None,
         )
     except Exception as exc:  # pragma: no cover - rendered by the Streamlit monitor
-        write_status(in_progress=False, filename=filename, stage="failed", error=str(exc))
+        write_status(
+            in_progress=False,
+            filename=filename,
+            stage="failed",
+            error=str(exc),
+        )

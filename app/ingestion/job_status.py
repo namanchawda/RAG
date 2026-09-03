@@ -25,6 +25,7 @@ def default_status() -> dict:
         "current": 0,
         "total": 0,
         "chunk_count": 0,
+        "process_pid": None,
         "started_at": None,
         "error": None,
     }

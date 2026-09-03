@@ -40,7 +40,13 @@ def ingest_file(
         raise FileNotFoundError(f"Filing not found: {filepath}")
 
     report("Loading document... (5%)", 0.05)
-    raw_text = extracted_text if extracted_text is not None else load_filing(str(path))
+    if extracted_text is not None:
+        raw_text = extracted_text
+    else:
+        try:
+            raw_text = load_filing(str(path))
+        except Exception as exc:
+            raise RuntimeError(f"Failed to extract text from {path.name}: {exc}") from exc
     report("Chunking... (20%)", 0.2)
     chunks = chunk_text(raw_text, strategy=chunking_strategy)
     print(f"Loaded {filepath}: produced {len(chunks)} chunks")

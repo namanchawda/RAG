@@ -83,30 +83,135 @@ def launch_ingestion_worker(
     worker.start()
 
 
+def render_ingestion_stage_ui(status: dict) -> None:
+    """Render stage-based ingestion progress, using real percentage only for embeddings."""
+    raw_stage = str(status.get("stage", "starting")).lower().strip()
+    stage_key = raw_stage.replace("-", "_").replace(" ", "_")
+    current = status.get("current", 0)
+    total = status.get("total", 0)
+
+    # Normalize possible worker stage names into a small, user-friendly pipeline.
+    stage_aliases = {
+        "starting": "starting",
+        "start": "starting",
+        "reading": "reading",
+        "read": "reading",
+        "extracting": "extracting",
+        "extract_text": "extracting",
+        "extracting_text": "extracting",
+        "parsing": "extracting",
+        "chunking": "chunking",
+        "chunk": "chunking",
+        "creating_chunks": "chunking",
+        "embedding": "embedding",
+        "embeddings": "embedding",
+        "storing": "storing",
+        "saving": "storing",
+        "database": "storing",
+        "complete": "complete",
+    }
+    current_stage = stage_aliases.get(stage_key, stage_key)
+
+    stages = [
+        ("starting", "Preparing document"),
+        ("reading", "Reading document"),
+        ("extracting", "Extracting text"),
+        ("chunking", "Creating chunks"),
+        ("embedding", "Generating embeddings"),
+        ("storing", "Saving to vector database"),
+    ]
+
+    # If the worker reports an unknown stage, show it without breaking the UI.
+    known_keys = {key for key, _ in stages}
+    if current_stage not in known_keys and current_stage != "complete":
+        stages.insert(-1, (current_stage, current_stage.replace("_", " ").title()))
+
+    current_index = next(
+        (index for index, (key, _) in enumerate(stages) if key == current_stage),
+        0,
+    )
+
+    filename = status.get("filename", "document")
+    stage_label = dict(stages).get(
+        current_stage,
+        current_stage.replace("_", " ").title(),
+    )
+
+    st.info(f"📄 Processing **{filename}**")
+
+    # Show a compact pipeline so the user sees meaningful activity before
+    # percentage-based embedding progress becomes available.
+    pipeline_html = ["<div style='margin: 0.4rem 0 0.8rem 0;'>"]
+    for index, (key, label) in enumerate(stages):
+        if index < current_index:
+            icon = "✓"
+            weight = "normal"
+        elif index == current_index:
+            icon = "●"
+            weight = "600"
+        else:
+            icon = "○"
+            weight = "normal"
+
+        pipeline_html.append(
+            f"<div style='line-height: 1.8; font-weight: {weight};'>"
+            f"<span style='display:inline-block; width:24px;'>{icon}</span>{label}"
+            f"</div>"
+        )
+    pipeline_html.append("</div>")
+    st.markdown("".join(pipeline_html), unsafe_allow_html=True)
+
+    if current_stage == "embedding" and total > 0:
+        percent = round(current / total * 100)
+        st.progress(
+            min(max(percent / 100, 0.0), 1.0),
+            text=f"🧠 Generating embeddings: {current}/{total} chunks ({percent}%)",
+        )
+    elif current_stage not in {"complete", "failed"}:
+        # Indeterminate animation avoids showing a misleading 0% progress bar.
+        st.markdown(
+            """
+            <div style="
+                width: 100%;
+                height: 8px;
+                border-radius: 999px;
+                overflow: hidden;
+                background: rgba(128,128,128,0.20);
+                margin: 0.4rem 0 0.7rem 0;
+            ">
+                <div style="
+                    width: 35%;
+                    height: 100%;
+                    border-radius: 999px;
+                    background: rgba(128,128,128,0.65);
+                    animation: ingestion-slide 1.4s ease-in-out infinite;
+                "></div>
+            </div>
+            <style>
+            @keyframes ingestion-slide {
+                0%   { transform: translateX(-120%); }
+                50%  { transform: translateX(180%); }
+                100% { transform: translateX(300%); }
+            }
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    if current_stage == "embedding" and total > 0:
+        st.caption(f"Current stage: {stage_label}")
+    elif current_stage not in {"complete", "failed"}:
+        st.caption(f"⏳ {stage_label}... Please wait.")
+
+
 def render_ingestion_monitor() -> None:
     """Poll durable worker status so progress survives Streamlit reruns and refreshes."""
+
     @st.fragment(run_every="2s")
     def poll_main_status() -> None:
         status = mark_stale_if_needed()
         if status.get("in_progress"):
-            current = status.get("current", 0)
-            total = status.get("total", 0)
-            percent = round(current / total * 100) if total else 0
-            stage = str(status.get("stage", "starting")).replace("_", " ").title()
-            message = (
-                f"A document is currently being ingested: {status.get('filename', '')} "
-                f"— {stage} ({percent}%)"
-            )
-            progress_text = (
-                f"{stage}: {current}/{total} chunks ({percent}%)"
-                if total else f"{stage}..."
-            )
-            st.info(message)
-            if stage.lower() == "embedding" and total > 0:
-                st.progress(
-                    min(max(percent / 100, 0.0), 1.0),
-                    text=progress_text,
-                )
+            render_ingestion_stage_ui(status)
         elif status.get("stage") == "failed":
             st.error(f"Ingestion failed: {status.get('error', 'Unknown error')}")
 
@@ -114,21 +219,7 @@ def render_ingestion_monitor() -> None:
     def poll_sidebar_status() -> None:
         status = mark_stale_if_needed()
         if status.get("in_progress"):
-            current = status.get("current", 0)
-            total = status.get("total", 0)
-            percent = round(current / total * 100) if total else 0
-            stage = str(status.get("stage", "starting")).replace("_", " ").title()
-            message = (
-                f"A document is currently being ingested: {status.get('filename', '')} "
-                f"— {stage} ({percent}%)"
-            )
-            progress_text = (
-                f"{stage}: {current}/{total} chunks ({percent}%)"
-                if total else f"{stage}..."
-            )
-            st.info(message)
-            if stage.lower() == "embedding" and total > 0:
-                st.progress(min(max(percent / 100, 0.0), 1.0), text=progress_text)
+            render_ingestion_stage_ui(status)
         elif status.get("stage") == "failed":
             st.error(f"Ingestion failed: {status.get('error', 'Unknown error')}")
         elif status.get("stage") == "complete" and not st.session_state.get("ingestion_success_pending"):
@@ -272,7 +363,7 @@ if success_pending:
 selected_source = None
 
 with st.sidebar:
-    if st.button("Disconnect"):
+    if st.button("Disconnect", disabled=ingestion_in_progress):
         st.session_state["db_connected"] = False
         clear_connection_details()
         st.rerun()
@@ -292,6 +383,7 @@ with st.sidebar:
         options=list(CHUNKING_STRATEGY_LABELS.keys()),
         format_func=lambda strategy: CHUNKING_STRATEGY_LABELS[strategy],
         index=0,
+        disabled=ingestion_in_progress,
     )
 
     if st.button("Ingest", disabled=ingestion_in_progress):
