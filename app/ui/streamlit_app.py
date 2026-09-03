@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
+import time
+import threading
 from pathlib import Path
 
 os.environ["STREAMLIT_WATCHER_TYPE"] = "none"
@@ -17,7 +20,7 @@ from app.config import settings
 from app.generation.rag_pipeline import prepare_answer, stream_prepared_answer
 from app.ingestion import store
 from app.ingestion.ingest import ingest_file
-from app.ingestion.loader import load_filing
+from app.ingestion.job_status import mark_stale_if_needed, read_status, write_status
 
 DocumentChunk = store.DocumentChunk
 
@@ -33,6 +36,7 @@ CHUNKING_STRATEGY_LABELS = {
 }
 TEXT_WARNING_LIMIT = 200_000
 TEXT_HARD_LIMIT = 1_000_000
+ingestion_status = mark_stale_if_needed()
 
 
 def format_strategy_label(strategy: str) -> str:
@@ -54,6 +58,83 @@ def clear_connection_details() -> None:
     """Remove any persisted DB/Groq connection cache."""
     if CONNECTION_FILE.exists():
         CONNECTION_FILE.unlink()
+
+
+def run_ingestion_job(filepath: str, filename: str, chunking_strategy: str) -> None:
+    """Run ingestion outside the Streamlit script and persist every state update."""
+    def update_progress(message: str, progress: float) -> None:
+        stage = re.sub(r"\s*\(\d+%\)\s*$", "", message.split(":", 1)[0]).strip().rstrip(".")
+        current = 0
+        total = 0
+        if stage == "Embedding" and "/" in message:
+            counts = message.split(":", 1)[1].split("(", 1)[0].strip().split("/")
+            current = int(counts[0])
+            total = int(counts[1].split()[0])
+        write_status(stage=stage.lower(), current=current, total=total)
+
+    try:
+        ingest_file(filepath, chunking_strategy=chunking_strategy, progress_callback=update_progress)
+        status = read_status()
+        write_status(
+            in_progress=False,
+            stage="complete",
+            current=status.get("current", 0),
+            total=status.get("total", 0),
+            error=None,
+        )
+    except Exception as exc:  # pragma: no cover - worker error is rendered by the UI
+        write_status(in_progress=False, stage="failed", error=str(exc))
+
+
+def start_ingestion_job(filepath: str, filename: str, chunking_strategy: str) -> None:
+    """Start a daemon ingestion worker after recording its initial durable state."""
+    write_status(
+        in_progress=True,
+        filename=filename,
+        stage="starting",
+        current=0,
+        total=0,
+        started_at=time.time(),
+        error=None,
+    )
+    launch_ingestion_worker(filepath, filename, chunking_strategy)
+
+
+def launch_ingestion_worker(filepath: str, filename: str, chunking_strategy: str) -> None:
+    """Launch a worker after the uploaded file is safely available on disk."""
+    worker = threading.Thread(
+        target=run_ingestion_job,
+        args=(filepath, filename, chunking_strategy),
+        daemon=True,
+        name="ingestion-worker",
+    )
+    worker.start()
+
+
+def render_ingestion_monitor() -> None:
+    """Poll durable worker status so progress survives Streamlit reruns and refreshes."""
+    status_placeholder = st.empty()
+
+    @st.fragment(run_every="2s")
+    def poll_status() -> None:
+        status = mark_stale_if_needed()
+        if status.get("in_progress"):
+            current = status.get("current", 0)
+            total = status.get("total", 0)
+            percent = round(current / total * 100) if total else 0
+            stage = str(status.get("stage", "starting")).replace("_", " ").title()
+            status_placeholder.info(
+                f"A document is currently being ingested: {status.get('filename', '')} "
+                f"— {stage} ({percent}%)"
+            )
+            status_placeholder.progress(
+                min(max(percent / 100, 0.0), 1.0),
+                text=f"{stage}: {current}/{total} chunks ({percent}%)" if total else f"{stage}...",
+            )
+        elif status.get("stage") == "failed":
+            status_placeholder.error(f"Ingestion failed: {status.get('error', 'Unknown error')}")
+
+    poll_status()
 
 
 def get_available_documents() -> list[dict]:
@@ -171,6 +252,9 @@ if not st.session_state.get("db_connected"):
 
 
 st.title("RAG")
+ingestion_in_progress = bool(ingestion_status.get("in_progress"))
+if ingestion_in_progress:
+    render_ingestion_monitor()
 
 selected_source = None
 
@@ -185,8 +269,18 @@ with st.sidebar:
         "Upload a PDF or HTML filing",
         type=["pdf", "html", "htm"],
         accept_multiple_files=False,
+        disabled=ingestion_in_progress,
     )
-    if uploaded_file is not None and uploaded_file.size > 5 * 1024 * 1024:
+    if ingestion_in_progress:
+        status_stage = str(ingestion_status.get("stage", "starting")).replace("_", " ").title()
+        status_current = ingestion_status.get("current", 0)
+        status_total = ingestion_status.get("total", 0)
+        status_percent = round(status_current / status_total * 100) if status_total else 0
+        st.info(
+            f"A document is currently being ingested: {ingestion_status.get('filename', '')} "
+            f"— {status_stage} ({status_percent}%)."
+        )
+    elif uploaded_file is not None and uploaded_file.size > 5 * 1024 * 1024:
         st.warning("Large files may take several minutes to process on this hosted environment.")
 
     chunking_strategy = st.selectbox(
@@ -196,45 +290,27 @@ with st.sidebar:
         index=0,
     )
 
-    if st.button("Ingest"):
+    if st.button("Ingest", disabled=ingestion_in_progress):
         if uploaded_file is None:
             st.warning("Please upload a PDF or HTML file before ingesting.")
         else:
             destination = RAW_DIR / uploaded_file.name
             try:
-                progress_bar = st.progress(0.0, text="Loading document... (0%)")
-
-                def update_progress(message: str, progress: float) -> None:
-                    progress_bar.progress(min(max(progress, 0.0), 1.0), text=message)
-
+                write_status(
+                    in_progress=True,
+                    filename=uploaded_file.name,
+                    stage="starting",
+                    current=0,
+                    total=0,
+                    started_at=time.time(),
+                    error=None,
+                )
                 destination.write_bytes(uploaded_file.getvalue())
-                extracted_text = load_filing(str(destination))
-                st.info(f"Extracted {len(extracted_text):,} characters of text from this document.")
-
-                if len(extracted_text) > TEXT_HARD_LIMIT:
-                    st.error(
-                        f"This document contains {len(extracted_text):,} extracted characters, which exceeds the "
-                        f"{TEXT_HARD_LIMIT:,}-character limit for this hosted environment."
-                    )
-                    progress_bar.empty()
-                    st.stop()
-
-                if len(extracted_text) >= TEXT_WARNING_LIMIT:
-                    st.warning(
-                        f"This document contains {len(extracted_text):,} extracted characters and may take several "
-                        "minutes to process on this hosted environment."
-                    )
-
-                ingest_file(
-                    str(destination),
-                    chunking_strategy=chunking_strategy,
-                    progress_callback=update_progress,
-                    extracted_text=extracted_text,
-                )
-                st.success(
-                    f"Ingested {uploaded_file.name} successfully using '{CHUNKING_STRATEGY_LABELS[chunking_strategy]}'."
-                )
+                launch_ingestion_worker(str(destination), uploaded_file.name, chunking_strategy)
+                st.success(f"Ingestion started for {uploaded_file.name}.")
+                st.rerun()
             except Exception as exc:
+                write_status(in_progress=False, stage="failed", error=str(exc))
                 st.error(f"Ingestion failed: {exc}")
 
     st.header("Document filter")
