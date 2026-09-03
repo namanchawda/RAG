@@ -42,6 +42,9 @@ def load_filing(filepath: str) -> str:
     suffix = path.suffix.lower()
 
     if suffix == ".pdf":
+        if not path.read_bytes().startswith(b"%PDF-"):
+            raise ValueError("File does not appear to be a valid PDF (invalid header)")
+
         reader = PdfReader(str(path))
         pages: list[str] = []
         for page in reader.pages:

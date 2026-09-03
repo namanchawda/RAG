@@ -1,0 +1,402 @@
+[
+  {
+    "id": "q01",
+    "category": "direct",
+    "question": "Where is Apple headquartered?",
+    "expected_answer": "Apple Inc. is headquartered in Cupertino, California.",
+    "actual_answer": "Apple’s headquarters is located in Cupertino, California.",
+    "verdict": "PASS",
+    "sources": [
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 35,
+        "distance": 0.33235500253304817,
+        "rerank_score": 0.9973672032356262
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 37,
+        "distance": 0.34488556816832894,
+        "rerank_score": 0.2778066098690033
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 28,
+        "distance": 0.36926788412939215,
+        "rerank_score": 0.07256097346544266
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 8,
+        "distance": 0.28574090770550453,
+        "rerank_score": 0.04349282383918762
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 66,
+        "distance": 0.3736888989024687,
+        "rerank_score": 0.01841750741004944
+      }
+    ]
+  },
+  {
+    "id": "q02",
+    "category": "direct",
+    "question": "On which stock exchange is Apple's common stock traded, and what is the ticker symbol?",
+    "expected_answer": "Apple's common stock is traded on The Nasdaq Stock Market under the ticker symbol AAPL.",
+    "actual_answer": "I don't have enough information in the provided context to answer this.",
+    "verdict": "FAIL",
+    "sources": [
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 38,
+        "distance": 0.2719000306010283,
+        "rerank_score": 0.8487356901168823
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 2,
+        "distance": 0.2801900243985682,
+        "rerank_score": 0.2545235753059387
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 51,
+        "distance": 0.3225270913525061,
+        "rerank_score": 0.14995121955871582
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 39,
+        "distance": 0.2666607658064809,
+        "rerank_score": 0.1496114879846573
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 52,
+        "distance": 0.28921868140808704,
+        "rerank_score": 0.013817432336509228
+      }
+    ]
+  },
+  {
+    "id": "q03",
+    "category": "direct",
+    "question": "What fiscal year ended in Apple's 2025 Form 10-K?",
+    "expected_answer": "The fiscal year ended on September 27, 2025.",
+    "actual_answer": "Apple’s 2025 Form 10‑K reports the fiscal year that ended on **September 27, 2025**.",
+    "verdict": "PASS",
+    "sources": [
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 51,
+        "distance": 0.2767747475639021,
+        "rerank_score": 0.9974405765533447
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 50,
+        "distance": 0.18166917562484164,
+        "rerank_score": 0.9923731684684753
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 42,
+        "distance": 0.2586980903924532,
+        "rerank_score": 0.9913727045059204
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 52,
+        "distance": 0.28127129562325925,
+        "rerank_score": 0.9910180568695068
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 44,
+        "distance": 0.1976052522659245,
+        "rerank_score": 0.9905616641044617
+      }
+    ]
+  },
+  {
+    "id": "q04",
+    "category": "direct",
+    "question": "What did Apple announce in May 2025 regarding a repurchase program?",
+    "expected_answer": "Apple announced a new $100 billion share repurchase program on May 1, 2025.",
+    "actual_answer": "Apple announced in May 2025 that it was launching an additional share‑repurchase program that would allow the company to buy back up to $100 billion of its common stock.",
+    "verdict": "PASS",
+    "sources": [
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 38,
+        "distance": 0.23030663909355498,
+        "rerank_score": 0.9929312467575073
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 45,
+        "distance": 0.31259922310118415,
+        "rerank_score": 0.1747911423444748
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 35,
+        "distance": 0.25067845733995575,
+        "rerank_score": 0.08501339703798294
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 19,
+        "distance": 0.34689557552337646,
+        "rerank_score": 0.0668976753950119
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 46,
+        "distance": 0.3289206624031067,
+        "rerank_score": 0.045759402215480804
+      }
+    ]
+  },
+  {
+    "id": "q05",
+    "category": "semantic_paraphrase",
+    "question": "Apple's base of operations is in which city and state?",
+    "expected_answer": "Apple's headquarters are in Cupertino, California.",
+    "actual_answer": "Apple’s headquarters—and thus its base of operations—is in Cupertino, California.",
+    "verdict": "PASS",
+    "sources": [
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 35,
+        "distance": 0.4088629308004058,
+        "rerank_score": 0.918813169002533
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 37,
+        "distance": 0.4007540762649199,
+        "rerank_score": 0.18437570333480835
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 10,
+        "distance": 0.43185833502660087,
+        "rerank_score": 0.09282535314559937
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 44,
+        "distance": 0.41574559117879817,
+        "rerank_score": 0.060900185257196426
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 50,
+        "distance": 0.408370351292469,
+        "rerank_score": 0.0579831637442112
+      }
+    ]
+  },
+  {
+    "id": "q06",
+    "category": "semantic_paraphrase",
+    "question": "Which exchange lists Apple shares and what symbol identifies them?",
+    "expected_answer": "Apple shares trade on The Nasdaq Stock Market under the symbol AAPL.",
+    "actual_answer": "I don't have enough information in the provided context to answer this.",
+    "verdict": "FAIL",
+    "sources": [
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 38,
+        "distance": 0.2543032472495136,
+        "rerank_score": 0.3918028771877289
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 51,
+        "distance": 0.30606440865608486,
+        "rerank_score": 0.05433295667171478
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 2,
+        "distance": 0.2569744893282043,
+        "rerank_score": 0.03112848289310932
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 50,
+        "distance": 0.30894708633422363,
+        "rerank_score": 0.015477831475436687
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 52,
+        "distance": 0.2663679281692449,
+        "rerank_score": 0.014312488958239555
+      }
+    ]
+  },
+  {
+    "id": "q07",
+    "category": "semantic_paraphrase",
+    "question": "When did Apple's most recent fiscal year close?",
+    "expected_answer": "Apple's fiscal year ended on September 27, 2025.",
+    "actual_answer": "Apple’s most recent fiscal year closed on September 27, 2025.",
+    "verdict": "PASS",
+    "sources": [
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 2,
+        "distance": 0.3283179993913766,
+        "rerank_score": 0.9879463315010071
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 35,
+        "distance": 0.34497584968661366,
+        "rerank_score": 0.8847933411598206
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 51,
+        "distance": 0.3408675783096856,
+        "rerank_score": 0.6122565865516663
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 40,
+        "distance": 0.24489038391921347,
+        "rerank_score": 0.4014568030834198
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 3,
+        "distance": 0.3143983500243632,
+        "rerank_score": 0.29185858368873596
+      }
+    ]
+  },
+  {
+    "id": "q08",
+    "category": "numeric_lookup",
+    "question": "How much was the repurchase authorization Apple announced in May 2024, and when was it fully utilized?",
+    "expected_answer": "Apple announced a $110 billion repurchase program in May 2024, and it was fully utilized by Q4 2025.",
+    "actual_answer": "Apple announced in May 2024 a share‑repurchase program authorizing up to **$110 billion** of common stock purchases. The program was fully utilized **in the fourth quarter of 2025**, when the final $19.8 billion of the May 2024 authorization was spent.",
+    "verdict": "PASS",
+    "sources": [
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 38,
+        "distance": 0.22690618038176946,
+        "rerank_score": 0.990262508392334
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 35,
+        "distance": 0.26825877224627526,
+        "rerank_score": 0.818496584892273
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 46,
+        "distance": 0.31992356062390914,
+        "rerank_score": 0.32247164845466614
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 45,
+        "distance": 0.3015482066216223,
+        "rerank_score": 0.17146846652030945
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 66,
+        "distance": 0.32344192266463756,
+        "rerank_score": 0.0427735336124897
+      }
+    ]
+  },
+  {
+    "id": "q09",
+    "category": "numeric_lookup",
+    "question": "What was the size of the new share repurchase program announced by Apple on May 1, 2025?",
+    "expected_answer": "The new authorized repurchase program was $100 billion.",
+    "actual_answer": "Apple’s new share repurchase program announced on May 1 2025 was authorized to repurchase up to **$100 billion** of the Company’s common stock.",
+    "verdict": "PASS",
+    "sources": [
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 38,
+        "distance": 0.16525144369908684,
+        "rerank_score": 0.9986442923545837
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 45,
+        "distance": 0.32492206544148416,
+        "rerank_score": 0.6190499067306519
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 46,
+        "distance": 0.28490912914276123,
+        "rerank_score": 0.5499110817909241
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 35,
+        "distance": 0.2164568667547958,
+        "rerank_score": 0.08808224648237228
+      },
+      {
+        "source_file": "aapl_10k_2025.html",
+        "chunk_id": 66,
+        "distance": 0.28815867234222003,
+        "rerank_score": 0.04681909456849098
+      }
+    ]
+  },
+  {
+    "id": "q10",
+    "category": "direct",
+    "question": "On which stock exchange is JPMorgan Chase common stock traded, and what is the ticker symbol?",
+    "expected_answer": "JPMorgan Chase common stock trades on the New York Stock Exchange under the ticker symbol JPM.",
+    "actual_answer": "JPMorgan Chase’s common stock is listed on the New York Stock Exchange (NYSE) under the ticker symbol **JPM**.",
+    "verdict": "PASS",
+    "sources": [
+      {
+        "source_file": "jpm_10k_2025.html",
+        "chunk_id": 2,
+        "distance": 0.29766732135420904,
+        "rerank_score": 0.4176085293292999
+      },
+      {
+        "source_file": "jpm_10k_2025.html",
+        "chunk_id": 83,
+        "distance": 0.31057643686918324,
+        "rerank_score": 0.3827473819255829
+      },
+      {
+        "source_file": "jpm_10k_2025.html",
+        "chunk_id": 5,
+        "distance": 0.25162873421993026,
+        "rerank_score": 0.2858105003833771
+      },
+      {
+        "source_file": "jpm_10k_2025.html",
+        "chunk_id": 173,
+        "distance": 0.29253822200341983,
+        "rerank_score": 0.26510077714920044
+      },
+      {
+        "source_file": "jpm_10k_2025.html",
+        "chunk_id": 89,
+        "distance": 0.30803557086202926,
+        "rerank_score": 0.05889720842242241
+      }
+    ]
+  }
+]

@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
+
+os.environ["STREAMLIT_WATCHER_TYPE"] = "none"
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
@@ -180,6 +183,9 @@ with st.sidebar:
         type=["pdf", "html", "htm"],
         accept_multiple_files=False,
     )
+    if uploaded_file is not None and uploaded_file.size > 5 * 1024 * 1024:
+        st.warning("Large files may take several minutes to process on this hosted environment.")
+
     chunking_strategy = st.selectbox(
         "Chunking strategy",
         options=list(CHUNKING_STRATEGY_LABELS.keys()),
@@ -193,9 +199,17 @@ with st.sidebar:
         else:
             destination = RAW_DIR / uploaded_file.name
             try:
-                with st.spinner("Saving and ingesting document..."):
-                    destination.write_bytes(uploaded_file.getvalue())
-                    ingest_file(str(destination), chunking_strategy=chunking_strategy)
+                progress_bar = st.progress(0, text="Preparing ingestion...")
+
+                def update_progress(message: str, progress: float) -> None:
+                    progress_bar.progress(progress, text=message)
+
+                destination.write_bytes(uploaded_file.getvalue())
+                ingest_file(
+                    str(destination),
+                    chunking_strategy=chunking_strategy,
+                    progress_callback=update_progress,
+                )
                 st.success(
                     f"Ingested {uploaded_file.name} successfully using '{CHUNKING_STRATEGY_LABELS[chunking_strategy]}'."
                 )

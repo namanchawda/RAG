@@ -7,6 +7,7 @@ text, embed the chunks in batch, and store the rows in the pgvector-backed table
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable
 from pathlib import Path
 
 from app.ingestion import store
@@ -17,7 +18,11 @@ from app.ingestion.loader import load_filing
 DocumentChunk = store.DocumentChunk
 
 
-def ingest_file(filepath: str, chunking_strategy: str = "fixed") -> None:
+def ingest_file(
+    filepath: str,
+    chunking_strategy: str = "fixed",
+    progress_callback: Callable[[str, float], None] | None = None,
+) -> None:
     """Load a filing, create chunks, embed them, and store the result in Postgres.
 
     Step 1: read the document text from a local file via load_filing().
@@ -25,11 +30,17 @@ def ingest_file(filepath: str, chunking_strategy: str = "fixed") -> None:
     Step 3: convert the chunk list into plain text strings and batch-embed them.
     Step 4: store the chunk metadata and embeddings into the vector table.
     """
+    def report(message: str, progress: float) -> None:
+        if progress_callback is not None:
+            progress_callback(message, progress)
+
     path = Path(filepath)
     if not path.exists():
         raise FileNotFoundError(f"Filing not found: {filepath}")
 
+    report("Loading document...", 0.05)
     raw_text = load_filing(str(path))
+    report("Chunking...", 0.2)
     chunks = chunk_text(raw_text, strategy=chunking_strategy)
     print(f"Loaded {filepath}: produced {len(chunks)} chunks")
 
@@ -38,7 +49,13 @@ def ingest_file(filepath: str, chunking_strategy: str = "fixed") -> None:
         return
 
     texts = [chunk["text"] for chunk in chunks]
-    embeddings = embed_texts(texts)
+    embeddings: list[list[float]] = []
+    batch_size = 32
+    for start in range(0, len(texts), batch_size):
+        batch_embeddings = embed_texts(texts[start : start + batch_size])
+        embeddings.extend(batch_embeddings)
+        embedded_count = min(start + batch_size, len(texts))
+        report(f"Embedding {embedded_count}/{len(texts)} chunks...", 0.2 + 0.65 * embedded_count / len(texts))
 
     if len(embeddings) != len(chunks):
         raise ValueError(
@@ -46,7 +63,9 @@ def ingest_file(filepath: str, chunking_strategy: str = "fixed") -> None:
         )
 
     source_file = path.name
+    report("Storing...", 0.95)
     store.store_chunks(source_file, chunks, embeddings, chunking_strategy=chunking_strategy)
+    report("Complete", 1.0)
     print(f"Stored {len(chunks)} chunks for {source_file} in the vector database.")
 
 
