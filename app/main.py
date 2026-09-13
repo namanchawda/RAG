@@ -15,8 +15,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        # TODO: add your Vercel URL here once deployed, e.g.
-        # "https://rag-single-doc-chat.vercel.app",
+        "https://rag-quick-demo.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
