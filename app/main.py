@@ -4,22 +4,32 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router as api_router
+from app.ingestion import store
 
 app = FastAPI(
-    title="SEC Filing RAG",
-    description="Naive RAG baseline for retrieving and answering questions from SEC 10-K filings.",
-    version="0.1.0",
+    title="RAG Chatbot",
+    description="Naive RAG baseline for retrieving and answering questions from an uploaded file only"
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        # TODO: add your Vercel URL here once deployed, e.g.
+        # "https://rag-single-doc-chat.vercel.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 app.include_router(api_router)
+
+
+@app.on_event("startup")
+def initialize_application() -> None:
+    """Initialize the single environment-backed database connection at startup."""
+    store.init_engine()
+    store.create_table()
 
 
 @app.get("/health")
