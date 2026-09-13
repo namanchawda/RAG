@@ -58,15 +58,14 @@ def _default_database_url() -> str:
     )
 
 
-def init_engine(database_url: str) -> None:
+def init_engine(database_url: str | None = None) -> None:
     """Initialize the module-level SQLAlchemy engine and session factory.
 
-    The caller passes the full database URL directly (for example a NeonDB URL),
-    which makes the app able to switch DB connection at runtime without reloading
-    a module or editing environment values.
+    The database URL is built from the environment-backed settings by default.
+    An explicit URL is retained only for compatibility with existing callers.
     """
     global engine, SessionLocal
-    engine = create_engine(database_url, pool_pre_ping=True)
+    engine = create_engine(database_url or _default_database_url(), pool_pre_ping=True)
     SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
@@ -191,6 +190,13 @@ def store_chunks(
         ]
         session.add_all(rows)
         session.commit()
+
+
+def clear_all_documents() -> None:
+    """Delete every stored chunk so the database contains one document at most."""
+    _ensure_initialized()
+    with engine.begin() as conn:
+        conn.execute(DocumentChunk.__table__.delete())
 
 
 if __name__ == "__main__":
