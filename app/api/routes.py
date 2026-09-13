@@ -11,15 +11,14 @@ from pydantic import BaseModel
 
 from app.generation.rag_pipeline import answer_question
 from app.ingestion import store
-from app.ingestion.chunker import chunk_text
 from app.ingestion.ingest import ingest_file
-from app.ingestion.loader import load_filing
 
 DocumentChunk = store.DocumentChunk
 
 router = APIRouter(prefix="/api", tags=["rag"])
 
 SUPPORTED_EXTENSIONS = {".pdf", ".html", ".htm", ".txt", ".md", ".rtf"}
+MAX_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024
 
 
 class QueryRequest(BaseModel):
@@ -53,6 +52,21 @@ def ingest_documents(file: UploadFile = File(...)) -> dict:
         )
 
     try:
+        file.file.seek(0, os.SEEK_END)
+        upload_size = file.file.tell()
+        file.file.seek(0)
+    except Exception as exc:
+        file.file.close()
+        raise HTTPException(status_code=500, detail=f"Failed to inspect uploaded file: {exc}") from exc
+
+    if upload_size > MAX_UPLOAD_SIZE_BYTES:
+        file.file.close()
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="File is too large. Please upload a document smaller than 25 MB.",
+        )
+
+    try:
         contents = file.file.read()
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to read uploaded file: {exc}") from exc
@@ -64,6 +78,7 @@ def ingest_documents(file: UploadFile = File(...)) -> dict:
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         tmp.write(contents)
         temp_path = tmp.name
+    contents = None
 
     try:
         store.create_table()
@@ -71,8 +86,7 @@ def ingest_documents(file: UploadFile = File(...)) -> dict:
         # original name, so a temp path with the same suffix works the same way.
         # source_file is recorded using the original uploaded filename so it still
         # displays correctly and is retrievable later.
-        ingest_file(temp_path, source_file=file.filename)
-        chunk_count = len(chunk_text(load_filing(temp_path)))
+        chunk_count = ingest_file(temp_path, source_file=file.filename)
         return {
             "filename": file.filename,
             "chunks_created": chunk_count,

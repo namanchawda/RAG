@@ -22,7 +22,7 @@ def load_embedding_model(model_name: str = settings.EMBEDDING_MODEL):
 def embed_texts(
     texts: list[str],
     progress_callback: Callable[[int, int], None] | None = None,
-    batch_size: int = 16,
+    batch_size: int = 4,
 ) -> list[list[float]]:
     """Embed texts in small batches and report progress after each completed batch."""
     if not texts:
