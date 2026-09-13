@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import tempfile
 from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
@@ -17,8 +19,6 @@ DocumentChunk = store.DocumentChunk
 
 router = APIRouter(prefix="/api", tags=["rag"])
 
-RAW_DIR = Path("data/raw")
-RAW_DIR.mkdir(parents=True, exist_ok=True)
 SUPPORTED_EXTENSIONS = {".pdf", ".html", ".htm", ".txt", ".md", ".rtf"}
 
 
@@ -27,13 +27,18 @@ class QueryRequest(BaseModel):
 
     question: str
     source_file: str | None = None
-    use_reranking: bool = True
+    use_reranking: bool = False
     top_k: int = 5
 
 
 @router.post("/ingest", status_code=status.HTTP_200_OK)
 def ingest_documents(file: UploadFile = File(...)) -> dict:
-    """Upload a file to data/raw and ingest it into the vector database."""
+    """Ingest an uploaded file into the vector database without persisting it in the repo.
+
+    The file is written to a temporary location (outside data/raw), used only for
+    the duration of the ingestion pipeline, and deleted immediately afterward
+    regardless of success or failure.
+    """
     if not file.filename:
         raise HTTPException(status_code=400, detail="A file upload is required.")
 
@@ -47,19 +52,27 @@ def ingest_documents(file: UploadFile = File(...)) -> dict:
             ),
         )
 
-    destination = RAW_DIR / file.filename
     try:
         contents = file.file.read()
-        destination.write_bytes(contents)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to save uploaded file: {exc}") from exc
+        raise HTTPException(status_code=500, detail=f"Failed to read uploaded file: {exc}") from exc
     finally:
         file.file.close()
 
+    # NamedTemporaryFile(delete=False) so we control exactly when it's removed;
+    # we always clean it up in the finally block below.
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(contents)
+        temp_path = tmp.name
+
     try:
         store.create_table()
-        ingest_file(str(destination))
-        chunk_count = len(chunk_text(load_filing(str(destination))))
+        # ingest_file / load_filing use the file's path and extension, not its
+        # original name, so a temp path with the same suffix works the same way.
+        # source_file is recorded using the original uploaded filename so it still
+        # displays correctly and is retrievable later.
+        ingest_file(temp_path, source_file=file.filename)
+        chunk_count = len(chunk_text(load_filing(temp_path)))
         return {
             "filename": file.filename,
             "chunks_created": chunk_count,
@@ -67,6 +80,11 @@ def ingest_documents(file: UploadFile = File(...)) -> dict:
         }
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {exc}") from exc
+    finally:
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
 
 
 @router.post("/query", status_code=status.HTTP_200_OK)

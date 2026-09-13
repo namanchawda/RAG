@@ -16,7 +16,7 @@ def prepare_answer(
     top_k: int | None = None,
     source_file: str | None = None,
     chunking_strategy: str | None = None,
-    use_reranking: bool = True,
+    use_reranking: bool = False,
 ) -> dict:
     """Retrieve and prepare grounded context before either buffered or streamed generation."""
     store._ensure_initialized()
@@ -47,7 +47,7 @@ def answer_question_stream(
     top_k: int | None = None,
     source_file: str | None = None,
     chunking_strategy: str | None = None,
-    use_reranking: bool = True,
+    use_reranking: bool = False,
 ):
     """Yield the generated answer after retrieval and reranking complete."""
     prepared = prepare_answer(
@@ -70,7 +70,7 @@ def answer_question(
     top_k: int | None = None,
     source_file: str | None = None,
     chunking_strategy: str | None = None,
-    use_reranking: bool = True,
+    use_reranking: bool = False,
 ) -> dict:
     """Run retrieval on the query, build a grounded prompt, and generate an answer."""
     prepared = prepare_answer(

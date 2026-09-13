@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
-from sentence_transformers import CrossEncoder
-
 from app.config import settings
 
 
-cross_encoder = CrossEncoder("BAAI/bge-reranker-base", max_length=512)
+cross_encoder = None
+
+
+def load_cross_encoder():
+    """Return the reranker, loading it only when reranking is requested."""
+    global cross_encoder
+    if cross_encoder is None:
+        from sentence_transformers import CrossEncoder
+
+        cross_encoder = CrossEncoder("BAAI/bge-reranker-base", max_length=512)
+    return cross_encoder
 
 
 def rerank(query: str, candidates: list[dict], top_k: int = None) -> list[dict]:
@@ -23,7 +31,7 @@ def rerank(query: str, candidates: list[dict], top_k: int = None) -> list[dict]:
         return []
 
     pairs = [(query, candidate.get("chunk_text", "")) for candidate in candidates]
-    scores = cross_encoder.predict(pairs, show_progress_bar=False, convert_to_numpy=True)
+    scores = load_cross_encoder().predict(pairs, show_progress_bar=False, convert_to_numpy=True)
 
     reranked = []
     for candidate, score in zip(candidates, scores):
