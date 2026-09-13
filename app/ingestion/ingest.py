@@ -64,27 +64,40 @@ def ingest_file(
         print(f"No chunks generated for {filepath}; skipping storage.")
         return 0
 
-    texts = [chunk["text"] for chunk in chunks]
-    def report_embedding_progress(current: int, total: int) -> None:
-        percentage = round(current / total * 100) if total else 100
-        if current == 0:
-            report(f"Embedding: 0/{total} chunks (0%)", 0.2)
-        else:
+    resolved_source_file = source_file or path.name
+
+    for batch_start in range(0, len(chunks), 4):
+        batch_chunks = chunks[batch_start : batch_start + 4]
+        batch_texts = [chunk["text"] for chunk in batch_chunks]
+
+        def report_embedding_progress(current: int, _batch_total: int) -> None:
+            overall_current = batch_start + current
+            percentage = round(overall_current / len(chunks) * 100)
             report(
-                f"Embedding: {current}/{total} chunks ({percentage}%)",
-                0.2 + 0.65 * current / total,
+                f"Embedding: {overall_current}/{len(chunks)} chunks ({percentage}%)",
+                0.2 + 0.65 * overall_current / len(chunks),
             )
 
-    embeddings = embed_texts(texts, progress_callback=report_embedding_progress)
-
-    if len(embeddings) != len(chunks):
-        raise ValueError(
-            f"Embedding count mismatch for {filepath}: {len(embeddings)} embeddings for {len(chunks)} chunks"
+        batch_embeddings = embed_texts(
+            batch_texts,
+            progress_callback=report_embedding_progress,
+            batch_size=4,
         )
 
-    resolved_source_file = source_file or path.name
+        if len(batch_embeddings) != len(batch_chunks):
+            raise ValueError(
+                f"Embedding count mismatch for {filepath}: "
+                f"{len(batch_embeddings)} embeddings for {len(batch_chunks)} chunks"
+            )
+
+        store.store_chunks(
+            resolved_source_file,
+            batch_chunks,
+            batch_embeddings,
+            chunking_strategy=chunking_strategy,
+        )
+
     report("Storing... (95%)", 0.95)
-    store.store_chunks(resolved_source_file, chunks, embeddings, chunking_strategy=chunking_strategy)
     report("Complete (100%)", 1.0)
     print(f"Stored {len(chunks)} chunks for {resolved_source_file} in the vector database.")
     return len(chunks)
