@@ -23,6 +23,7 @@ def ingest_file(
     chunking_strategy: str = "fixed",
     progress_callback: Callable[[str, float], None] | None = None,
     extracted_text: str | None = None,
+    source_file: str | None = None,
 ) -> int:
     """Load a filing, create chunks, embed them, and store the result in Postgres.
 
@@ -30,6 +31,11 @@ def ingest_file(
     Step 2: split the text into token-based chunks with chunk_text().
     Step 3: convert the chunk list into plain text strings and batch-embed them.
     Step 4: store the chunk metadata and embeddings into the vector table.
+
+    `source_file` overrides the name recorded in the database (defaults to the
+    filepath's own filename). This lets callers ingest from a temporary path
+    (e.g. an uploaded file staged outside the repo) while still recording the
+    original, user-facing filename.
     """
     def report(message: str, progress: float) -> None:
         if progress_callback is not None:
@@ -38,6 +44,9 @@ def ingest_file(
     path = Path(filepath)
     if not path.exists():
         raise FileNotFoundError(f"Filing not found: {filepath}")
+
+    # This branch intentionally supports exactly one active document.
+    store.clear_all_documents()
 
     report("Loading document... (5%)", 0.05)
     if extracted_text is not None:
@@ -73,11 +82,11 @@ def ingest_file(
             f"Embedding count mismatch for {filepath}: {len(embeddings)} embeddings for {len(chunks)} chunks"
         )
 
-    source_file = path.name
+    resolved_source_file = source_file or path.name
     report("Storing... (95%)", 0.95)
-    store.store_chunks(source_file, chunks, embeddings, chunking_strategy=chunking_strategy)
+    store.store_chunks(resolved_source_file, chunks, embeddings, chunking_strategy=chunking_strategy)
     report("Complete (100%)", 1.0)
-    print(f"Stored {len(chunks)} chunks for {source_file} in the vector database.")
+    print(f"Stored {len(chunks)} chunks for {resolved_source_file} in the vector database.")
     return len(chunks)
 
 
